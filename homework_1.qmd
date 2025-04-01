@@ -1,0 +1,289 @@
+---
+title: "Homework #1"
+format:
+  html:
+    toc: true
+    toc-location: left
+    theme: custom.scss
+    highlight-style: oblivion
+    self-contained: true
+editor: 
+  markdown: 
+    wrap: 72
+---
+ 
+See all that stuff above. You should change `theme` and `highlight-style`
+to fit your own style. You can find them here:
+https://quarto.org/docs/output-formats/html-themes.html
+
+Seriously, you should start finding your own style, so definitely change
+them!
+
+## Data
+
+You'll be working with the following data files:
+
+-   `artist_genre.txt`
+
+-   `artist_name.csv`
+
+-   `artist_net_worth.csv`
+
+-   `artist_number_one_hits.csv`
+
+-   `artist_studio_albums.csv`
+
+-   `artist_top_hits.csv`
+
+The only file that you are going to need to be careful about is the
+`artist_genre` file -- be sure to look at the extension, refer to the
+notes on I/O, and read the help file!
+
+## Goals
+
+Read the files in and then accomplish the following goals:
+
+### Pre-join Goals
+
+-   Use the aggregate function to ensure that each file only contains
+    unique rows.
+
+-   If duplicates exist, handle them. You can either de-duplicate them
+    (the `duplicate` function is helpful here) or `aggregate` them to
+    single rows. The choice is yours and yours alone, but be sure to
+    justify your decision.
+
+-   Which 5 artists have the greatest net worth?
+
+-   Which 15 artists have the most number 1 hits?
+
+-   Which 10 artists have the fewest studio albums?
+
+After you have those done, you can join your data frames together.
+<br> **Reading in the Data Tables** <br>
+```{r}
+
+
+artist_name <- read.csv("~/Desktop/DataWrangling/homework1/artist_name.csv")
+
+artist_net_worth <- read.csv("~/Desktop/DataWrangling/homework1/artist_net_worth.csv")
+
+artist_number_one_hits <- read.csv("~/Desktop/DataWrangling/homework1/artist_number_one_hits.csv")
+
+artist_studio_albums <- read.csv("~/Desktop/DataWrangling/homework1/artist_studio_albums.csv")
+
+artist_top_hits <- read.csv("~/Desktop/DataWrangling/homework1/artist_top_hits.csv")
+
+artist_genre <- read.table(file = "~/Desktop/DataWrangling/homework1/artist_genre.txt", header = TRUE)
+
+```
+
+<br> **Aggregating Artist Name, removing the duplicates** <br>
+
+```{r}
+artist_name_2 <- artist_name
+
+artist_name_2 <- aggregate(Birth_Year ~ Artist, 
+          data = artist_name_2,
+          FUN = unique)
+duplicated(artist_name_2)
+```
+
+<br> **Aggregating Artist Net Worth, removing duplicates** <br>
+
+```{r}
+artist_net_worth_2 <- artist_net_worth
+artist_net_worth_2 <- aggregate(net_worth_millions ~ Artist, 
+                                data = artist_net_worth_2,
+                                FUN = unique)
+```
+
+<br> **Aggregating Artist Genre, removing duplicates** <br>
+
+```{r}
+artist_genre_2 <- artist_genre
+artist_genre_2 <- aggregate(genre ~ Artist, 
+                            data = artist_genre_2, 
+                            FUN = unique)
+```
+
+<br> **Aggregating Artist number one hits, removing duplicates** <br>
+
+```{r}
+artist_number_one_hits_2 <- artist_number_one_hits
+artist_number_one_hits_2 <- aggregate(number_one_hits ~ artist, 
+                            data = artist_number_one_hits_2, 
+                            FUN = unique)
+```
+
+<br> **Aggregating Artist Studio Albums, removing duplicates** <br>
+
+```{r}
+artist_studio_albums_2 <- artist_studio_albums
+artist_studio_albums_2 <- aggregate(studio_albums ~ Artist, 
+                                    data = artist_studio_albums_2, 
+                                    FUN = unique)
+```
+
+<br> **Aggregating Top Hits by Artist, removing duplicates** <br>
+
+```{r}
+artist_top_hits_2 <- artist_top_hits
+artist_top_hits_2 <- aggregate(cbind(Top_Hit, Year) ~ Artist, 
+                               data = artist_top_hits_2, 
+                               FUN = unique)
+```
+
+<br> **Sorting Artist by their Net Worth in Millions to determine the
+top 5 artists w/ highest net worth** <br>
+
+```{r}
+artist_net_worth_2$net_worth_millions <- 
+  as.numeric(gsub("\\$", "", x = artist_net_worth_2$net_worth_millions))
+sort(artist_net_worth_2$net_worth_millions, decreasing = TRUE)
+artist_net_worth_2 <- artist_net_worth_2[order(artist_net_worth_2$net_worth_millions, 
+                             decreasing = TRUE),]
+artist_net_worth_2[1:5, ]
+```
+
+-   Which 5 artists have the greatest net worth?
+
+1.  Jay-Z (\$1500M)
+2.  The Beatles (\$1500M)
+3.  ABBA (\$900M)
+4.  The Rolling Stones (\$900M)
+5.  Madonna (\$850M)
+
+<br> **Sorting Artists by their #1 Hits to determine top 15 artists.**
+<br>
+
+```{r}
+artist_number_one_hits_2 <- artist_number_one_hits_2[order(artist_number_one_hits_2$number_one_hits, 
+                             decreasing = TRUE), ]
+artist_number_one_hits_2[1:15, ]
+```
+
+-   Which 15 artists have the most number 1 hits?
+
+1.  The Beatles (20)
+2.  Mariah Carey (19)
+3.  Elvis Presley (18).
+4.  Rihanna (14)
+5.  Michael Jackson(13) )
+6.  Madonna (12)
+7.  Whitney Houston (11)
+8.  Stevie Wonder (10)
+9.  Katy Perry (9)
+10. Drake (8)
+11. The Rolling Stones (8)
+12. Bruno Mars(7)
+13. Taylor Swift (7)
+14. Ed Sheeran (6)
+15. Elton John (6)
+
+<br> **Which artists have the fewest studio albums?** <br>
+
+```{r}
+artist_studio_albums_2 <- artist_studio_albums_2[order(artist_studio_albums_2$studio_albums,
+                             decreasing = FALSE), ]
+artist_studio_albums_2[1:10, ]
+```
+
+-   Which 10 artists have the fewest studio albums?
+    1.  Billie Eillish (1)
+    2.  Lorde (2)
+    3.  The Notorious B.I.G (2)
+    4.  Adele (3)
+    5.  Bruno Mars (3)
+    6.  Jimi Hendrix (3)
+    7.  Nirvana (3)
+    8.  Sam Smith (3)
+    9.  Imagine Dragons (4)
+    10. Justin Timerlake (4)
+
+### Post-join Goals
+
+-   Create variables to capture the following ideas:
+    -   How long has the artist been around? You can just use their
+        birth year.
+    -   Something to capture each artist's net worth per studio album.
+-   Plot net worth per studio album, the "been around" variable, and
+    genre. There should be points and colors here.
+
+For all tasks comment your code and explain what you found!
+
+<br>**Join Tables** <br>
+
+```{r}
+merge_artist_1 <- merge(x = artist_genre_2,
+                        y = artist_name_2,
+                        by = "Artist",
+                        all.x = TRUE)
+merge_artist_2 <- merge(x = artist_net_worth_2,
+                        y = artist_studio_albums_2,
+                        by = "Artist",
+                        all.x = TRUE)
+merge_artist_3 <- merge(x = merge_artist_1,
+                        y= merge_artist_2,
+                        by = "Artist",
+                        all.x = TRUE)
+
+# Need to change column names of Artist Column in
+# Number One Hits and Top Hits to make sense & merge into the complete_artist_data data frame
+
+colnames(artist_number_one_hits_2)[colnames(artist_number_one_hits_2) == "artist"] = "Artist"
+colnames(artist_top_hits_2)[colnames(artist_top_hits_2) == "Year"] = "Top_Hit_Release_Year"
+
+merge_artist_4 <- merge(x = artist_top_hits_2,
+                        y = artist_number_one_hits_2,
+                        by = "Artist",
+                        all.x = TRUE)
+complete_artist_data <- merge(x = merge_artist_3,
+                              y = merge_artist_4,
+                              by = "Artist",
+                              all.x = TRUE)
+```
+
+<br> **Calculate how long the artist has 'been around' or their age
+Column Name will be Artist Been Around in Complete Artist Data** <br>
+
+```{r}
+library(dplyr)
+current_year <- as.numeric(format(Sys.Date(),"%Y")) 
+current_year
+artist_been_around <- current_year - complete_artist_data$Birth_Year
+
+artist_been_around <- data.frame(artist_name_2$Artist, artist_been_around)
+
+colnames(artist_been_around)[colnames(artist_been_around) == "artist_name_2.Artist"] = "Artist"
+
+complete_artist_data <- merge(x = complete_artist_data,
+                              y = artist_been_around, 
+                              by = "Artist",
+                              all.x = TRUE)
+
+```
+
+<br> **Something to capture each artist's net worth per studio album.**
+<br>
+
+```{r}
+net_worth_studio_album <- merge_artist_2$net_worth_millions / merge_artist_2$studio_albums
+net_worth_studio_album <- round(net_worth_studio_album, digits = 2)
+#Add Net Worth per Studio Album to Complete Artist Data Set
+complete_artist_data$net_worth_studio_album = net_worth_studio_album
+
+```
+
+-   Plot net worth per studio album, the "been around" variable, and
+    genre. There should be points and colors here.
+
+```{r}
+library(ggplot2)
+
+ggplot(complete_artist_data, aes(x = artist_been_around,
+           y = net_worth_studio_album,
+           color = genre)) +
+      geom_point() +
+      theme_bw()
+```
