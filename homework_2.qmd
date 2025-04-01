@@ -1,0 +1,225 @@
+---
+title: "Homework #2"
+author: Elisabeth Gangwer
+format:
+  html:
+    toc: true
+    toc-location: left
+    theme: custom.scss
+    highlight-style: oblivion
+    self-contained: true
+editor: 
+  markdown: 
+    wrap: 72
+---
+
+## The Data
+
+There is 1000 observations, spread across 10 csv files in a zip.
+
+1.   First you will need to use `unzip` to unzip it.
+
+2.   Next, you will need to generate a vector of all of those files with
+    `list.files`. It works like this:
+
+```{r}
+library(stringr)
+library(reshape2)
+library(ggplot2)
+file_list <- list.files("~/Desktop/DataWrangling/homework2/data/", pattern = ".csv", 
+                        all.files = TRUE, full.names = TRUE)
+df_list <- lapply(file_list, read.csv)
+
+better_df <- do.call(rbind, df_list)
+```
+
+3.  You can use a `for loop`, an `lapply`, or a `purrr::map` statement
+    to bring all of those files together into one data frame. The
+    columns are in the same order, so feel free to bind them together.
+    If you end up with a list of data frames, you can use
+    `do.call(rbind, your_object)`, `dplyr::bind_rows`, or
+    `data.table::rbindlist` to bring them together.
+
+## Data Prep Tasks
+
+This part should live in a separate qmd file.
+
+1.  Create a function to clean ratings & length variables.
+
+2.  Create a total length (as in movie length) column.
+
+3.  Create a date delta between release time and review time.
+
+4.  Pick a word from the reviews and count how many times that word
+    appears.
+
+5.  Create an aggregated data set for the unique movies. There should be
+    movies, average ratings, release year, genre, and total number of
+    reviews.
+
+6.  You should have two data frames, so `save` those objects for the
+    next step.
+
+## Analytic Tasks
+
+The tasks below should live in a separate qmd from your prep work. You
+will want to `load` your data from the previous step.
+
+```{r}
+# load Data Prep
+load("homework_2_data.Rdata")
+# better_df
+# even_better_df
+```
+
+1.  Which genre has the highest critic rating? Viewer rating?
+
+```{r}
+# Create data frame based on genre & critic rating & viewer rating from better_df
+agg_rating_maybe <- aggregate(avg_rating ~ reviewer_type + genre, 
+                              FUN = mean, 
+                              data = better_df)
+
+# Go from long data frame to wide data frame, use dcast to widen data frame  
+widen_agg_rating <- dcast(data = agg_rating_maybe, 
+                          formula = genre ~ reviewer_type,
+                          value.var = "avg_rating")
+
+# Find the highest rating of each reviewer type
+
+# Comedy has the highest average critic rating 
+widen_agg_rating[which.max(widen_agg_rating$Critic), ]
+
+# Drama has the highest average viewer rating 
+widen_agg_rating[which.max(widen_agg_rating$Viewer), ] 
+```
+
+The genre with the highest critic rating is Comedy, while Drama has the
+highest viewer rating.
+
+2.  What is the relationship between movie length and average rating?
+
+```{r}
+# Movie length is different for movies in the data provided, 
+# decided to average the total length in minutes
+better_df[better_df$title == 'A Glimpse Through Time', ]
+
+
+# Create separate data frames based on movie length & average rating, then merge together
+# aggregate
+agg_movie_rating <- aggregate(avg_rating ~ title, 
+                                     FUN = mean, 
+                                     data = better_df)
+agg_movie_length <- aggregate(total_length ~ title, 
+                                     FUN = mean, 
+                                     data = better_df)
+# merge two aggregations together
+movie_rating_length <- merge(x = agg_movie_length,
+                              y = agg_movie_rating, 
+                              by = 'title')
+
+# Find the correlation between movie length & avg_rating
+cor(movie_rating_length$avg_rating, movie_rating_length$total_length)
+# Correlation = -0.04958 
+# Very low correlation
+
+# plot the movie length & avg_rating to visualize relationship 
+ggplot(movie_rating_length, aes(avg_rating, total_length)) +
+  geom_point() +
+  geom_smooth(method = 'lm', se = FALSE) +
+  theme_minimal()
+```
+
+The relationship between the total length of a movie and the average
+rating is weak. This shows that the total length of a movie does not
+necessarily contribute to the average rating.
+
+3.  What is the relationship between the date delta and average rating?
+
+```{r}
+# Aggregate date_diff by title from better_df
+date_agg_relationship <- aggregate(date_diff ~ title,
+                                      FUN = mean, 
+                                      data = better_df)
+
+# merge aggregation & avg_rating from even_better_df
+rating_date_dif_relationship <- merge(x = date_agg_relationship, 
+                                      y = even_better_df,
+                                      by = 'title')
+
+# Checking to make sure mean of date diff was calculated correctly 
+mean(better_df$date_diff[better_df$title == 'A Glimpse Through Time'])
+
+# Find correlation of avg_rating & date_diff
+cor(rating_date_dif_relationship$avg_rating, rating_date_dif_relationship$date_diff)
+# correlation = -0.242
+
+# ggplot relationship 
+ggplot(rating_date_dif_relationship, aes(avg_rating, date_diff)) +
+  geom_point() +
+  geom_smooth(method = 'lm', se = FALSE) +
+  theme_minimal()
+```
+
+The correlation between average rating and date delta is higher than the
+length of a movie and the average rating but is still overall a weak
+relationship. This suggests that the average rating is not affected by
+the date difference of review date and the movie release date.
+
+4.  What is the relationship between total number of reviews and
+    average?
+
+```{r}
+str(even_better_df)
+# convert total reviews to numeric 
+even_better_df$total_reviews <- as.numeric(even_better_df$total_reviews)
+
+# Find correlation of total number of reviews & average rating 
+cor(even_better_df$avg_rating, even_better_df$total_reviews)
+# correlation = 0.475
+
+# Use ggplot to visualize the relationship 
+ggplot(even_better_df, aes(avg_rating, total_reviews)) + 
+  geom_point() +
+  geom_smooth(method = 'lm', se = FALSE) +
+  theme_minimal()
+```
+
+The relationship between the total number of reviews and average rating
+has a positive correlation of 0.475. This suggests, that the more
+reviews a movie has the average rating is more likely to increase.
+
+4.  Which movie contains your word of interest at the highest frequency.
+    Does that word have any relationship with average rating?
+
+```{r}
+# aggregate disaster by title.
+# To add the count of disaster not the mean, use the sum function
+agg_disaster <- aggregate(disaster ~ title, 
+                          data = better_df, 
+                          FUN = sum)
+
+# merge aggregation for avg_rating & disaster count by title 
+merge_disaster <- merge(x = agg_disaster, 
+                      y = even_better_df,
+                      by = 'title')
+
+# sort/order the count of disaster 
+merge_disaster <- merge_disaster[order(merge_disaster$disaster, decreasing = TRUE), ]
+merge_disaster[1:2, ]
+# Beyond the Horizon and Sweet Serenade both have the highest frequency of 'disaster' in the review text. 
+
+# Find relationship between avg_rating & 'disaster'
+cor(merge_disaster$avg_rating, merge_disaster$disaster)
+# correlation is -0.3997
+
+# Make a linear model of avg_rating and disaster to understand relationship. 
+lm1 <- lm(avg_rating ~ disaster, data = merge_disaster)
+summary(lm1)
+```
+
+Although, the amount of times disaster appears in a review would seem
+like it would affect the average rating, it does not. I decided to
+conduct a linear model. The linear model produced a low r-squared value,
+the amount of times disaster appears in movie reviews is insignificant
+or does not affect the average rating of a movie.
