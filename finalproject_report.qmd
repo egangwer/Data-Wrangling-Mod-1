@@ -1,0 +1,309 @@
+---
+title: "Outwit, Outplay, Outpredict: Spotting the Front-Runner by Episode Three"
+author: "Elisabeth Gangwer"
+format:
+  html:
+    toc: true
+    toc-location: left
+    self-contained: true
+---
+
+## Introduction
+
+Survivor seems to be an unpredictable show, with countless twists and a wide range of people from a variety of different backgrounds. Survivor has always been a show my family would watch together. And one of my favorite moments when I watched the show was guessing who was going to win or who was getting voted out. I have always wanted to know if there were any indicators in the early parts of a season that point to any front runners or the actual winner. <br> <br> For my final project, I will be looking at a data set that provides many data tables regarding information on all of the seasons and versions of survivor, episode summary, players(*castaways*), confessionals, and voting history. I will compare these findings to the latest season of Survivor. 
+
+### Primary Questions
+My primary questions is: Are there elements in the first three episodes of a season that point to a front runner for winning the season? Based on these elements, who is(are) the front runner(s) for season 47? 
+
+1. What is the relationship between *x* and *y*?
+  i) *x* is the winners/front runners of the specified season. <br>
+     *y* is episode elements like the total amount of confessionals, voting accuracy, challenge wins, etc. 
+2. Is there a group difference between *x* on *y*?
+    Do the winners/front runners have more confessionals in the first three episodes compared to the non-winning     players? 
+
+
+## Data
+The data that I am using for this project can be accessed from [github/doehm/survivoR](https://github.com/doehm/survivoR) 
+The data I used from github was separated into multiple *.rda* files with information from all versions of survivor with every season, castaway, confessional, etc... Essentially, there is a lot of data.<br>
+Before starting, I cleaned & extracted most of the data I would need in a separate r document. 
+<br> 
+Loading cleaned & extracted data.
+```{r}
+#| echo: true
+#| results: "hide"
+#| warning: false
+library(dplyr)
+library(reshape2)
+library(ggplot2)
+load("finalproject_dataframes.RData")
+rmarkdown::paged_table(winner_df)
+```
+<br> 
+**Changes** <br> 
+After adding my extracted data, I realized there were a few more things I wanted to add and change to the dataframes. 
+<br> 
+I created a new data frame of all players and added a TRUE or FALSE if they are the winner or not of that season. 
+This data frame provides information on the first three episodes of a season and if the castaway is the winner or not. US Versions Seasons 1 - 46 are being used. 
+```{r}
+castaway_df <- confessionals_df_wide
+colnames(castaway_df)[4] = "ep1_confessional"
+colnames(castaway_df)[5] = "ep2_confessional"
+colnames(castaway_df)[6] = "ep3_confessional"
+colnames(castaway_df)[7] = "total_confessional"
+castaway_df <- merge(castaway_df, 
+                     winner_df, 
+                     by = "castaway_id",
+                     all.x = TRUE)
+castaway_df$winner <- ifelse(castaway_df$season.x == castaway_df$season.y, TRUE, FALSE)
+castaway_df <- castaway_df[, c(1:7,9)]
+colnames(castaway_df)[2] = "season"
+colnames(castaway_df)[3] = "castaway"
+castaway_df$winner[is.na(castaway_df$winner)] <- FALSE
+```
+
+**Potential Issues** <br>
+I noticed that there were some issues with the castaway_df, winners (*Sandra and Tony*) that had played multiple times and won the game more than once were being repeated for all of the seasons they played and were returning both TRUE and FALSE. Using the duplicated function, I found the specific rows that were returning these errors. Then, I looked into what season's the two-time winners had won and removed the inaccurate rows. 
+```{r}
+castaway_df <- castaway_df[order(castaway_df$season),]
+sandra <- castaway_df %>% 
+  filter(castaway_id == "US0112")
+duplicates_specific <- castaway_df[duplicated(castaway_df[c("castaway_id", "season")]) | 
+                                        duplicated(castaway_df[c("castaway_id", "season")], fromLast = TRUE), ]
+castaway_df <- castaway_df[c(-151, -148, -548, -152, -543, -154, -545),]
+castaway_df$winner <- ifelse(castaway_df$winner == "TRUE", "WINNER", "LOSER")
+rmarkdown::paged_table(castaway_df)
+```
+<br> 
+**Adding the Eras** <br> 
+I also wanted to add the eras of Survivor defined here by [Vulture](https://www.vulture.com/article/survivor-guide-best-eras-seasons-players-moments.html). To better visualize and separate the data later on. 
+<br> 
+```{r}
+season_era <- data.frame(1:47)
+season_era$season <- seq(1:47)
+season_era$era <- seq(1:47)
+season_era$era[1:8] <- "The Golden Age"
+season_era$era[9:14] <- "The Identity Crisis"
+season_era$era[15:20] <- "The Renaissance"
+season_era$era[21:26] <- "The Dark Ages"
+season_era$era[27:32] <- "The Re-Renaissance"
+season_era$era[33:40] <- "The Worst Themes"
+season_era$era[41:47] <- "The New Era"
+
+castaway_df <- inner_join(castaway_df, season_era)
+castaway_df <- castaway_df[, -9]
+```
+<br> 
+**Losers/Non-Winner Table**
+I decided to create a losers/non-winners data frame because I already had a dataframe containing information on the winners. 
+```{r}
+loser_df <- castaway_df[castaway_df$winner == "LOSER",]
+```
+**Smaller Sample** 
+Bring "The New Era" players into a new data frame to create a smaller sample size. 
+```{r}
+new_era_castaways <- castaway_df[castaway_df$era == "The New Era", ]
+new_era_winners <- new_era_castaways[new_era_castaways$winner == "WINNER", ]
+new_era_losers <- new_era_castaways[new_era_castaways$winner == "LOSER", ]
+```
+**Calculating Averages** 
+I then created multiple data frames that contains the average number of confessionals per player in the first three episodes of a season. I used the dplyr package to group the players by season and winners/non-winners <br> 
+(*number of confessionals / total players left in the game*)
+```{r}
+firstEp_avg <- castaway_df %>% 
+  group_by(season, winner) %>% 
+  summarise(ep1_total = sum(ep1_confessional), count = n(), ep1_avg = mean(ep1_confessional)) %>% 
+  arrange(season)
+firstEp_avg <- firstEp_avg[-93, ]
+
+ep2_avg <- castaway_df %>% 
+  filter(!is.na(ep2_confessional)) %>% 
+  group_by(season, winner) %>% 
+  summarise(sum = sum(ep2_confessional),
+            count = n(), avg = mean(ep2_confessional)) %>% 
+  arrange(season)
+ep3_avg <- castaway_df %>% 
+  filter(!is.na(ep3_confessional)) %>% 
+  group_by(season, winner) %>% 
+  summarise(sum = sum(ep3_confessional),
+            count = n(), avg = mean(ep3_confessional)) %>% 
+  arrange(season)
+firstEp_avg <- firstEp_avg[-93, ]
+ep2_avg <- ep2_avg[-93, ]
+
+total_avg <- firstEp_avg
+total_avg$ep2_avg <- ep2_avg$avg
+total_avg$ep3_avg <- ep3_avg$avg
+total_avg <- total_avg[, c(-3, -4)]
+total_avg$total <- (total_avg$ep1_avg + total_avg$ep2_avg + total_avg$ep3_avg)/3
+```
+<br> 
+**Season 47** 
+Load & Update Season 47 Data for the first three episodes 
+```{r}
+load("~/Desktop/DataWrangling/final_project/data/confessionalsCopy.rda")
+confessional_47 <- confessionals
+confessional_47 <- confessional_47[confessional_47$version_season == "US47",]
+confessional_47 <- confessional_47[, 4:8]
+```
+<br>
+Make the season 47 data frame wider for clarity purposes & calculate the average three episode confessional count of said player
+```{r}
+confessional_47 <- dcast(confessional_47, 
+                        formula = season + castaway + castaway_id ~ episode, 
+                        value.var = "confessional_count")
+colnames(confessional_47)[4] = "ep1_confessional"
+colnames(confessional_47)[5] = "ep2_confessional"
+colnames(confessional_47)[6] = "ep3_confessional"
+confessional_47$total <- confessional_47$ep1_confessional +
+  confessional_47$ep2_confessional +
+  confessional_47$ep3_confessional
+confessional_47$total_avg <- confessional_47$total / 3
+```
+<br> 
+**Voting accuracy for season 47.**
+```{r}
+load("~/Desktop/DataWrangling/final_project/data/vote_historyCopy.rda")
+vote_47 <- vote_history[vote_history$version_season == "US47",]
+vote_47 <- vote_47[,c(4,5,9,20,11,17,21,22)]
+vote_47$correctly_voted <- ifelse(vote_47$vote_id == vote_47$voted_out_id, TRUE, FALSE)
+vote_47$voting_accuracy <- ifelse(vote_47$correctly_voted == TRUE, 1.00, 0.00)
+vote_47 <- dcast(vote_47, 
+                  formula = season + castaway_id + castaway + voting_accuracy ~ episode, 
+                  value.var = "correctly_voted")
+colnames(vote_47)[5] = "ep1_correctly_voted"
+colnames(vote_47)[6] = "ep2_correctly_voted"
+colnames(vote_47)[7] = "ep3_correctly_voted"
+```
+
+## Methods
+**t-test**
+I decided to conduct a t-test of the confessional count of winners & losers from all seasons to determine if the average number of confessionals a player has a relationship with  winning players. <br> 
+*Null Hypothesis:* The total confessional count of winner's is equal to the total confessional count of the losers. <br><br>
+*Alternative Hypothesis:* The total confessional count of winner's is different from the total confessional count of the losers. 
+```{r}
+t.test(winner_df$Total_Confessional_Count, loser_df$total_confessional)
+```
+
+<br>
+I decided to conduct a t-test of the confessional count of winners & losers of the new era to create a smaller sample size. <br> 
+Null Hypothesis: The total confessional count of winner's is equal to the total confessional count of the new era losers. <br>
+Alternative Hypothesis: The total confessional count of winner's is different from the total confessional count of the new era winners. 
+<br>
+```{r}
+t.test(new_era_losers$total_confessional, new_era_winners$total_confessional)
+```
+T-test of first episode confessional count for the new era and all seasons. 
+```{r}
+t.test(winner_df$Ep1_Confessional_Count, loser_df$ep1_confessional)
+t.test(new_era_losers$ep1_confessional, new_era_winners$ep1_confessional)
+```
+<br>
+*Fail to reject the null hypothesis.* 
+<br> <br>
+**New Approach** 
+After completing the t-test and failing to reject the null hypothesis, I decided to find the average confessional count of the new era's first episode and first three episodes. This will help determine the possible front runner's of Season 47. <br> 
+```{r}
+loser_total_df <- total_avg[total_avg$winner=="LOSER",]
+loser_total_df_new_era <- loser_total_df[loser_total_df$season > 41, ]
+new_era_loser_mean <- mean(loser_total_df_new_era$ep1_avg)
+new_era_loser_total_mean <- mean(loser_total_df_new_era$total)
+```
+*Loser Average Confessionals for first three episodes: 3.242* <br>
+*Loser Average Confessionals for first episode: 4.37*
+<br><br>
+Look at Season 47 players who's total confessional count average is above The New Era non-winner confessional average. 
+<br> *Filter Season 47 players who's first confessional count is above 4.40.*
+```{r}
+above_average <- confessional_47
+above_average <- above_average[above_average$total_avg >= 3.24, ]
+above_average <- na.omit(above_average)
+above_average <- above_average[above_average$ep1_confessional > 4.4, ]
+really_above_average <- inner_join(above_average, vote_47)
+rmarkdown::paged_table(really_above_average)
+```
+<br>
+
+## Results & Discussion
+**Some visualizations:**
+```{r}
+ggplot(total_avg, aes(x = season, y = total, fill = winner)) +
+  geom_col(position ='dodge') + 
+  labs(title = 'First Three Episode Confessional Average', fill = 'Winner or Loser?', 
+       y = 'Avg. Confessional Count') +
+  theme_minimal()
+```
+```{r}
+new_era_total <- total_avg[total_avg$season > 40, ]
+ggplot(new_era_total, aes(season, total, fill = winner)) +
+  geom_col(position = 'dodge') + 
+  scale_fill_manual(values = c("WINNER" = "#008080", "LOSER" = "#FF6F61")) +
+  labs(title = 'New Era First Three Episode Confessional Average', fill = 'Winner or Loser?', 
+       y = 'Avg. Confessional Count') +
+  theme_minimal()
+```
+Looking at most recent season *(Season 46)* episode confessional count
+```{r}
+season_46 <- castaway_df[castaway_df$season == '46', ]
+ggplot(season_46,aes(castaway, ep1_confessional, fill = winner)) + 
+  geom_col(position = position_dodge(width = 5)) +
+   labs(title = 'Season 46 1st Episode Confessional Count', fill = 'Winner/Loser', 
+       y = 'Avg. Confessional Count') +
+  scale_x_discrete(guide = guide_axis(n.dodge=2)) +
+  theme_minimal()
+ggplot(season_46,aes(castaway, total_confessional, fill = winner)) + 
+  geom_col(position = position_dodge(width = 5)) +
+  scale_fill_manual(values = c("WINNER" = "#008080", "LOSER" = "#FF6F61")) +
+   labs(title = 'Season 46 First 3Ep. Confessional Count', fill = 'Winner/Loser', 
+       y = 'Confessional Count') +
+  scale_x_discrete(guide = guide_axis(n.dodge=2)) + 
+  theme_minimal()
+```
+<br> 
+**Season 47 Front Runners** 
+```{r}
+ggplot(really_above_average, aes(castaway, ep1_confessional)) +
+  geom_col(width = 0.9, fill = "#008080") +
+  labs(title = 'Season 47 Front Runners', y = 'Confessional Count') +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+
+
+<br> <br> 
+After computing multiple t-tests of season winners and losers, we fail to reject the null hypothesis that the confessional count of winning and losing players are equal. Meaning that the count of confessionals between losers and winners are not statistically different. The confessionals of winners in the first three episodes does not play a significant role in determining a winner. <br> 
+After discovering that the number of confessional counts are not statistically different, I decided to find the average count of losing player confessionals in the first three episodes. This was `new_era_loser_total_mean`. After calculating the average, I used the average three episode confessional count for every player in season 47 and filtered out the one's below 3.20. This gave nine front runner's for season 47, which is half of the total players in season 47, making it not very valuable information. <br> 
+To reduce the possible front runner's further, I calculated the average number of confessionals players had in the first episode of the new era seasons `new_era_loser_mean`. I further filtered out the players in Season 47, who were below 4.4 confessionals in the first episode. <br> 
+My result set provided 5 front-runners for season 47.<br><br>
+**The 5 possible front-runners are Andy, Aysha, Gabe, Rachel, and Rome.** <br><br>
+To improve on the idea that the first three episodes of a season in Survivor provides context as to who will win, I believe it would be beneficial to add more variables into the data set like challenge performance, alliance history, public perception, and possibly more. Further, this could help make a predictive model for possible winners. <br> 
+Ultimately, Survivor is a reality tv-show, where there are multiple factors that play into a player winning the game that we cannot accurately quantify. 
+
+
+```{r}
+rmarkdown::paged_table(castaway_df)
+rmarkdown::paged_table(winner_df)
+rmarkdown::paged_table(loser_df)
+rmarkdown::paged_table(new_era_losers)
+rmarkdown::paged_table(new_era_winners)
+season_45 <- castaway_df[castaway_df$season == '45', ]
+ggplot(season_45,aes(castaway, total_confessional, fill = winner)) + 
+  geom_col(position = position_dodge(width = 0.5)) +
+  scale_fill_manual(values = c("WINNER" = "#008080", "LOSER" = "#FF6F61")) +
+   labs(title = 'Season 45 First 3Ep. Confessional Count', fill = 'Winner/Loser', 
+       y = 'Confessional Count') +
+  scale_x_discrete(guide = guide_axis(n.dodge=2)) + 
+  theme_minimal()
+mean(season_45$total_confessional)
+season_44 <- castaway_df[castaway_df$season == '44', ]
+ggplot(season_44,aes(castaway, total_confessional, fill = winner)) + 
+  geom_col(position = position_dodge(width = 0.5)) +
+  scale_fill_manual(values = c("WINNER" = "#008080", "LOSER" = "#FF6F61")) +
+   labs(title = 'Season 44 First 3Ep. Confessional Count', fill = 'Winner/Loser', 
+       y = 'Confessional Count') +
+  scale_x_discrete(guide = guide_axis(n.dodge=2)) + 
+  theme_minimal()
+mean(season_44$total_confessional)
+```
+
+
